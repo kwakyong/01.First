@@ -8,8 +8,14 @@ load_dotenv(BASE_DIR / ".env", override=True)
 if not os.getenv("BOKJIRO_API_KEY"):
     load_dotenv(BASE_DIR / ".env.example", override=True)
 
-BOKJIRO_API_KEY = os.getenv("BOKJIRO_API_KEY", "")
-BOKJIRO_URL = "https://apis.data.go.kr/B554287/WelfareInfoService/getWlfarListForEntp"
+def _get_api_key() -> str:
+    try:
+        import streamlit as st
+        return st.secrets.get("BOKJIRO_API_KEY", os.getenv("BOKJIRO_API_KEY", ""))
+    except Exception:
+        return os.getenv("BOKJIRO_API_KEY", "")
+
+BOKJIRO_URL = "https://api.odcloud.kr/api/15083323/v1/uddi:3929b807-3420-44d7-a851-cc741fce65a1"
 
 SAMPLE_BENEFITS = [
     {
@@ -110,20 +116,17 @@ CATEGORIES = sorted(set(b["category"] for b in SAMPLE_BENEFITS))
 
 def fetch_welfare_benefits(call_type: str = "A") -> list:
     """복지로 API 호출. API 키 없으면 샘플 데이터 반환."""
-    if not BOKJIRO_API_KEY:
+    api_key = _get_api_key()
+    if not api_key:
         return SAMPLE_BENEFITS
 
     try:
-        params = {
-            "serviceKey": BOKJIRO_API_KEY,
-            "callTp": call_type,
-            "pageNo": 1,
-            "numOfRows": 100,
-        }
-        resp = requests.get(BOKJIRO_URL, params=params, timeout=5)
+        headers = {"Authorization": f"Infuser {api_key}"}
+        params = {"page": 1, "perPage": 100}
+        resp = requests.get(BOKJIRO_URL, headers=headers, params=params, timeout=8)
         resp.raise_for_status()
         data = resp.json()
-        items = data.get("wantedList", [])
+        items = data.get("data", [])
         if items:
             return _parse_api_response(items)
     except Exception:
@@ -135,15 +138,19 @@ def fetch_welfare_benefits(call_type: str = "A") -> list:
 def _parse_api_response(items: list) -> list:
     result = []
     for i, item in enumerate(items, 1):
+        url = item.get("서비스URL") or item.get("사이트", "")
+        contact = item.get("대표문의", "")
+        apply_where = contact if contact else "복지로(bokjiro.go.kr) 또는 주민센터"
         result.append({
-            "id": i,
-            "name": item.get("servNm", ""),
-            "category": item.get("lifeNmArray", ["기타"])[0],
-            "description": item.get("servDgst", ""),
+            "id": item.get("서비스아이디", i),
+            "name": item.get("서비스명", f"서비스 {i}"),
+            "category": item.get("소관부처명", "기타"),
+            "description": item.get("서비스요약", ""),
             "age_min": 0,
-            "income_level": item.get("intrsThemaNmArray", ["전체"])[0],
-            "amount": item.get("sprtCn", "확인 필요"),
-            "apply_where": item.get("aplyMtd", "주민센터"),
+            "income_level": "전체",
+            "amount": "상세 내용은 서비스 페이지 확인",
+            "apply_where": apply_where,
+            "url": url,
         })
     return result
 

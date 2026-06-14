@@ -113,6 +113,7 @@ st.markdown(f'<div class="count-badge">총 {len(benefits)}개 혜택</div>', uns
 
 for b in benefits:
     color = CATEGORY_COLORS.get(b["category"], "#2C4A8A")
+    url_html = f'<a href="{b["url"]}" target="_blank" style="color:#2C4A8A;font-weight:600;">🔗 자세히 보기</a>' if b.get("url") else ""
     st.markdown(f"""
     <div class="benefit-card" style="border-left-color: {color};">
         <div class="benefit-title">{b['name']}</div>
@@ -121,6 +122,6 @@ for b in benefits:
             <span class="tag tag-amount">💰 {b['amount']}</span>
             <span class="tag tag-target">👤 {b['age_min']}세 이상 · {b['income_level']}</span>
         </div>
-        <div class="apply-row">📍 {b['apply_where']}</div>
+        <div class="apply-row">📍 {b['apply_where']} &nbsp; {url_html}</div>
     </div>
     """, unsafe_allow_html=True)
