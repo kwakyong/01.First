@@ -107,8 +107,9 @@ st.markdown("""
 
 category = st.selectbox("분야 선택", ["전체"] + sorted(CATEGORIES), index=0, label_visibility="collapsed")
 
-benefits = get_benefits_by_category(category)
+benefits, debug_msg = get_benefits_by_category(category)
 
+st.caption(debug_msg)
 st.markdown(f'<div class="count-badge">총 {len(benefits)}개 혜택</div>', unsafe_allow_html=True)
 
 for b in benefits:

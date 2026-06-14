@@ -114,25 +114,37 @@ SAMPLE_BENEFITS = [
 CATEGORIES = sorted(set(b["category"] for b in SAMPLE_BENEFITS))
 
 
-def fetch_welfare_benefits(call_type: str = "A") -> list:
-    """복지로 API 호출. API 키 없으면 샘플 데이터 반환."""
+def fetch_welfare_benefits(call_type: str = "A") -> tuple:
+    """복지로 API 호출. (데이터 리스트, 디버그 메시지) 반환."""
     api_key = _get_api_key()
     if not api_key:
-        return SAMPLE_BENEFITS
+        return SAMPLE_BENEFITS, "⚠️ API 키 없음 → 샘플 데이터 사용 중"
 
     try:
+        # 방법 1: Authorization 헤더 + perPage 10 (기본값으로 먼저 시도)
         headers = {"Authorization": f"Infuser {api_key}"}
-        params = {"page": 1, "perPage": 100}
+        params = {"page": 1, "perPage": 10}
         resp = requests.get(BOKJIRO_URL, headers=headers, params=params, timeout=8)
-        resp.raise_for_status()
+
+        # 방법 2: 헤더 실패 시 쿼리 파라미터로 재시도
+        if resp.status_code in (400, 401, 403):
+            params["Authorization"] = api_key
+            resp = requests.get(BOKJIRO_URL, params=params, timeout=8)
+
+        if resp.status_code == 401:
+            return SAMPLE_BENEFITS, "❌ 인증 실패 (401) → API 키를 확인하세요"
+        if resp.status_code != 200:
+            return SAMPLE_BENEFITS, f"❌ API 오류 (HTTP {resp.status_code}) — 응답: {resp.text[:200]}"
+
         data = resp.json()
+        total = data.get("totalCount", 0)
         items = data.get("data", [])
         if items:
-            return _parse_api_response(items)
-    except Exception:
-        pass
+            return _parse_api_response(items), f"✅ 복지로 API 연결 성공 (전체 {total}개 중 {len(items)}개 로드)"
+        return SAMPLE_BENEFITS, f"⚠️ API 응답 성공했지만 데이터 없음 — 원본: {str(data)[:200]}"
 
-    return SAMPLE_BENEFITS
+    except Exception as e:
+        return SAMPLE_BENEFITS, f"❌ API 호출 오류: {str(e)}"
 
 
 def _parse_api_response(items: list) -> list:
@@ -155,13 +167,13 @@ def _parse_api_response(items: list) -> list:
     return result
 
 
-def get_benefits_by_category(category: str) -> list:
-    benefits = fetch_welfare_benefits()
+def get_benefits_by_category(category: str) -> tuple:
+    benefits, debug = fetch_welfare_benefits()
     if category == "전체":
-        return benefits
-    return [b for b in benefits if b["category"] == category]
+        return benefits, debug
+    return [b for b in benefits if b["category"] == category], debug
 
 
 def get_benefits_by_age(age: int) -> list:
-    benefits = fetch_welfare_benefits()
+    benefits, _ = fetch_welfare_benefits()
     return [b for b in benefits if b["age_min"] <= age]
