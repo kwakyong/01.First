@@ -45,9 +45,17 @@ if saved:
 
 st.divider()
 
+CURRENT_YEAR = 2026
+
 with st.form("profile_form"):
-    age = st.number_input("나이 (세)", min_value=50, max_value=100,
-                          value=saved.get("age", 65), step=1)
+    birth_year = st.number_input(
+        "태어난 년도 (예: 1955)",
+        min_value=1926, max_value=2006,
+        value=saved.get("birth_year", 1961),
+        step=1,
+    )
+    age = CURRENT_YEAR - birth_year
+    st.caption(f"→ 만 {age}세")
     household = st.selectbox(
         "가구 유형",
         ["단독가구(혼자 사심)", "부부가구", "자녀와 함께 거주", "기타"],
@@ -78,11 +86,12 @@ with st.form("profile_form"):
         save_btn = st.form_submit_button("💾 정보 저장하기", use_container_width=True)
 
 user_profile = {
-    "age": age if "age" in dir() else 65,
-    "household": household if "household" in dir() else "단독가구(혼자 사심)",
-    "income": income if "income" in dir() else "월 50~100만원",
-    "disability": disability if "disability" in dir() else "없음",
-    "notes": notes if "notes" in dir() else "",
+    "birth_year": birth_year,
+    "age": age,
+    "household": household,
+    "income": income,
+    "disability": disability,
+    "notes": notes,
 }
 
 if save_btn:

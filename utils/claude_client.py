@@ -3,19 +3,28 @@ from pathlib import Path
 from openai import AzureOpenAI
 from dotenv import load_dotenv
 
-# 프로젝트 루트의 .env 또는 .env.example 을 명시적으로 로드
 BASE_DIR = Path(__file__).parent.parent
 load_dotenv(BASE_DIR / ".env", override=True)
 if not os.getenv("AZURE_OPENAI_API_KEY"):
     load_dotenv(BASE_DIR / ".env.example", override=True)
 
+
+def _secret(key: str, default: str = "") -> str:
+    """로컬 .env 또는 Streamlit Cloud secrets 에서 값을 읽습니다."""
+    try:
+        import streamlit as st
+        return st.secrets.get(key, os.getenv(key, default))
+    except Exception:
+        return os.getenv(key, default)
+
+
 client = AzureOpenAI(
-    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
+    api_key=_secret("AZURE_OPENAI_API_KEY"),
+    azure_endpoint=_secret("AZURE_OPENAI_ENDPOINT"),
+    api_version=_secret("AZURE_OPENAI_API_VERSION", "2024-02-01"),
 )
 
-DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
+DEPLOYMENT_NAME = _secret("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
 
 SYSTEM_PROMPT = """당신은 대한민국 사회복지 전문 상담사입니다.
 60대 이상 어르신들이 이해하기 쉽도록 쉬운 말로, 천천히, 친절하게 설명해주세요.
