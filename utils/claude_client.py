@@ -62,9 +62,99 @@ def check_eligibility(user_profile: dict, benefit_name: str) -> str:
     return ask_claude(prompt)
 
 
-def get_application_guide(benefit_name: str) -> str:
-    prompt = f"""'{benefit_name}' 혜택 신청 방법을 어르신도 따라할 수 있도록
-번호를 붙여 단계별로 설명해주세요.
-필요한 서류와 신청 장소(또는 사이트)도 포함해주세요."""
+def check_all_eligibility(user_profile: dict, benefits: list) -> dict:
+    """
+    TOP_BENEFITS 전체를 단 1회 AI 호출로 자격 분석.
+    반환: {서비스명: {"status": "가능"|"불가"|"확인필요", "reason": str}}
+    """
+    import json
+
+    benefit_lines = "\n".join(
+        f"- {b['name']} ({b.get('income_level','전체')}, {b.get('age_min',0)}세이상)"
+        for b in benefits
+    )
+
+    profile_lines = (
+        f"나이: {user_profile.get('age')}세 / "
+        f"성별: {user_profile.get('gender','미입력')} / "
+        f"가구유형: {user_profile.get('household','미입력')} / "
+        f"가구원수: {user_profile.get('household_size','미입력')} / "
+        f"월소득: {user_profile.get('income','미입력')} / "
+        f"주택소유: {user_profile.get('home_ownership','미입력')} / "
+        f"재산규모: {user_profile.get('asset_level','미입력')} / "
+        f"장애여부: {user_profile.get('disability','없음')} / "
+        f"건강상태: {user_profile.get('health_condition','없음')} / "
+        f"본인사업자: {user_profile.get('own_business','없음')} / "
+        f"배우자사업자: {user_profile.get('spouse_business','없음')} / "
+        f"국가유공자: {user_profile.get('veteran','없음')} / "
+        f"기타: {user_profile.get('notes','없음')}"
+    )
+
+    system_msg = (
+        "당신은 대한민국 복지 자격 분석 전문가입니다. "
+        "사용자 정보를 바탕으로 각 복지서비스 자격 여부를 판단합니다. "
+        "나이·소득 기준을 충족할 가능성이 있으면 '가능' 또는 '확인필요'로 판단하고, "
+        "명백히 기준 미달인 경우에만 '불가'로 판단하세요. "
+        "반드시 JSON만 출력하고 다른 설명은 쓰지 마세요."
+    )
+
+    user_msg = f"""사용자 정보: {profile_lines}
+
+복지서비스 목록:
+{benefit_lines}
+
+각 서비스에 대해 자격 여부를 분석하여 아래 JSON 형식으로 출력하세요.
+status는 "가능", "불가", "확인필요" 중 하나, reason은 20자 이내:
+{{"서비스명": {{"status": "가능", "reason": "이유"}}, ...}}"""
+
+    response = client.chat.completions.create(
+        model=DEPLOYMENT_NAME,
+        messages=[
+            {"role": "system", "content": system_msg},
+            {"role": "user",   "content": user_msg},
+        ],
+        max_tokens=4000,
+        temperature=0.3,
+    )
+
+    raw = response.choices[0].message.content or ""
+    try:
+        start = raw.find("{")
+        end   = raw.rfind("}") + 1
+        return json.loads(raw[start:end])
+    except Exception:
+        return {b["name"]: {"status": "확인필요", "reason": "결과 파싱 오류"} for b in benefits}
+
+
+def get_application_guide(benefit_name: str, user_profile: dict = None) -> str:
+    profile_text = ""
+    if user_profile:
+        profile_text = (
+            f"\n[신청인 정보]\n"
+            f"나이: {user_profile.get('age')}세 / "
+            f"가구유형: {user_profile.get('household','미입력')} / "
+            f"월소득: {user_profile.get('income','미입력')} / "
+            f"장애여부: {user_profile.get('disability','없음')}\n"
+        )
+
+    prompt = f"""'{benefit_name}' 혜택 신청 방법을 아래 구조로 안내해 주세요.
+{profile_text}
+어르신도 쉽게 따라할 수 있도록 쉬운 말로 작성해 주세요.
+
+**📋 필요 서류**
+- (서류 목록을 항목별로)
+
+**📍 신청 방법 (단계별)**
+1. (첫 번째 단계)
+2. ...
+
+**⏱ 처리 기간**
+(신청 후 결과까지 걸리는 기간)
+
+**⚠️ 꼭 확인하세요**
+- (주의사항 또는 자주 하는 실수)
+
+**📞 문의처**
+(담당 기관 및 전화번호)"""
 
     return ask_claude(prompt)
