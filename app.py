@@ -81,6 +81,13 @@ def _home():
             st.session_state["target_group"] = "youth"
             st.rerun()
 
+    group_label = "어르신 복지" if st.session_state["target_group"] == "senior" else "청소년·대학생 복지"
+    st.markdown(f"""
+<div class="info-bar">
+    ✅ <b>{group_label}</b> 모드로 설정되었습니다 &nbsp;·&nbsp; 👈 왼쪽 메뉴에서 원하시는 서비스를 선택하세요
+</div>
+""", unsafe_allow_html=True)
+
     st.markdown("---")
     st.markdown('<div class="section-label">주요 서비스</div>', unsafe_allow_html=True)
 
@@ -106,13 +113,6 @@ def _home():
     <div class="feature-title">신청 안내</div>
     <div class="feature-desc">단계별 신청 방법과<br>AI 상담 서비스</div>
 </div>""", unsafe_allow_html=True)
-
-    group_label = "어르신 복지" if st.session_state["target_group"] == "senior" else "청소년·대학생 복지"
-    st.markdown(f"""
-<div class="info-bar">
-    ✅ <b>{group_label}</b> 모드로 설정되었습니다 &nbsp;·&nbsp; 👈 왼쪽 메뉴에서 원하시는 서비스를 선택하세요
-</div>
-""", unsafe_allow_html=True)
 
 
 # ── 네비게이션 정의 ─────────────────────────────────────────────────────────
