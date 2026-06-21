@@ -84,7 +84,8 @@ def _home():
     group_label = "어르신 복지" if st.session_state["target_group"] == "senior" else "청소년·대학생 복지"
     st.markdown(f"""
 <div class="info-bar">
-    ✅ <b>{group_label}</b> 모드로 설정되었습니다 &nbsp;·&nbsp; 👈 왼쪽 메뉴에서 원하시는 서비스를 선택하세요
+    ✅ <b>{group_label}</b> 모드로 설정되었습니다<br>
+    <span style="font-size:0.9rem;font-weight:400;">👈 왼쪽 상단 &gt;&gt; 를 선택하여 서비스를 선택하세요.</span>
 </div>
 """, unsafe_allow_html=True)
 
