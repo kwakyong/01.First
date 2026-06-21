@@ -69,34 +69,68 @@ def check_all_eligibility(user_profile: dict, benefits: list) -> dict:
     """
     import json
 
+    def _age_range(b):
+        mn = b.get("age_min", 0)
+        mx = b.get("age_max")
+        return f"{mn}~{mx}세" if mx else f"{mn}세 이상"
+
     benefit_lines = "\n".join(
-        f"- {b['name']} ({b.get('income_level','전체')}, {b.get('age_min',0)}세이상)"
+        f"- {b['name']} | 나이:{_age_range(b)} | 소득:{b.get('income_level','전체')} | {b.get('description','')[:40]}"
         for b in benefits
     )
 
-    profile_lines = (
-        f"나이: {user_profile.get('age')}세 / "
-        f"성별: {user_profile.get('gender','미입력')} / "
-        f"가구유형: {user_profile.get('household','미입력')} / "
-        f"가구원수: {user_profile.get('household_size','미입력')} / "
-        f"월소득: {user_profile.get('income','미입력')} / "
-        f"주택소유: {user_profile.get('home_ownership','미입력')} / "
-        f"재산규모: {user_profile.get('asset_level','미입력')} / "
-        f"장애여부: {user_profile.get('disability','없음')} / "
-        f"건강상태: {user_profile.get('health_condition','없음')} / "
-        f"본인사업자: {user_profile.get('own_business','없음')} / "
-        f"배우자사업자: {user_profile.get('spouse_business','없음')} / "
-        f"국가유공자: {user_profile.get('veteran','없음')} / "
-        f"기타: {user_profile.get('notes','없음')}"
-    )
+    # 청소년 프로필 여부 감지 (school_status 필드 존재 시)
+    is_youth = "school_status" in user_profile
 
-    system_msg = (
-        "당신은 대한민국 복지 자격 분석 전문가입니다. "
-        "사용자 정보를 바탕으로 각 복지서비스 자격 여부를 판단합니다. "
-        "나이·소득 기준을 충족할 가능성이 있으면 '가능' 또는 '확인필요'로 판단하고, "
-        "명백히 기준 미달인 경우에만 '불가'로 판단하세요. "
-        "반드시 JSON만 출력하고 다른 설명은 쓰지 마세요."
-    )
+    if is_youth:
+        profile_lines = (
+            f"나이: {user_profile.get('age')}세 / "
+            f"성별: {user_profile.get('gender','미입력')} / "
+            f"학적현황: {user_profile.get('school_status','미입력')} / "
+            f"학년: {user_profile.get('grade','미입력')} / "
+            f"가족상황: {user_profile.get('family_situation','미입력')} / "
+            f"거주형태: {user_profile.get('household','미입력')} / "
+            f"가구소득분위(장학금기준): {user_profile.get('income_decile','미입력')} / "
+            f"월소득: {user_profile.get('income','미입력')} / "
+            f"수급현황: {user_profile.get('welfare_status','없음')} / "
+            f"장애여부: {user_profile.get('disability','없음')} / "
+            f"보호종료청년: {user_profile.get('protection','해당없음')} / "
+            f"기타: {user_profile.get('notes','없음')}"
+        )
+    else:
+        profile_lines = (
+            f"나이: {user_profile.get('age')}세 / "
+            f"성별: {user_profile.get('gender','미입력')} / "
+            f"가구유형: {user_profile.get('household','미입력')} / "
+            f"가구원수: {user_profile.get('household_size','미입력')} / "
+            f"월소득: {user_profile.get('income','미입력')} / "
+            f"주택소유: {user_profile.get('home_ownership','미입력')} / "
+            f"재산규모: {user_profile.get('asset_level','미입력')} / "
+            f"장애여부: {user_profile.get('disability','없음')} / "
+            f"건강상태: {user_profile.get('health_condition','없음')} / "
+            f"본인사업자: {user_profile.get('own_business','없음')} / "
+            f"배우자사업자: {user_profile.get('spouse_business','없음')} / "
+            f"국가유공자: {user_profile.get('veteran','없음')} / "
+            f"기타: {user_profile.get('notes','없음')}"
+        )
+
+    if is_youth:
+        system_msg = (
+            "당신은 대한민국 청소년·대학생 복지 및 장학금 자격 분석 전문가입니다. "
+            "사용자의 학적현황·가구소득분위·가족상황을 바탕으로 각 혜택의 자격 여부를 판단합니다. "
+            "소득분위 1~2구간(기초·차상위)이면 국가장학금·근로장학금·생활비대출 등 장학 혜택은 '가능'으로 판단하세요. "
+            "소득분위 정보가 있으면 이를 최우선으로 반영하고, 명백히 기준 미달(예: 고등학생 전용 혜택에 대학생)인 경우에만 '불가'로 판단하세요. "
+            "그 외 기준 충족 여부가 불분명한 경우는 '확인필요'로 판단하세요. "
+            "반드시 JSON만 출력하고 다른 설명은 쓰지 마세요."
+        )
+    else:
+        system_msg = (
+            "당신은 대한민국 복지 자격 분석 전문가입니다. "
+            "사용자 정보를 바탕으로 각 복지서비스 자격 여부를 판단합니다. "
+            "나이·소득 기준을 충족할 가능성이 있으면 '가능' 또는 '확인필요'로 판단하고, "
+            "명백히 기준 미달인 경우에만 '불가'로 판단하세요. "
+            "반드시 JSON만 출력하고 다른 설명은 쓰지 마세요."
+        )
 
     user_msg = f"""사용자 정보: {profile_lines}
 
