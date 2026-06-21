@@ -1,4 +1,5 @@
 """청소년·대학생 복지 전용 렌더링 모듈 — 혜택조회 / 자격확인 / 신청안내"""
+import json as _json
 import streamlit as st
 from collections import defaultdict
 
@@ -36,6 +37,18 @@ STATUS_STYLE = {
 }
 
 CURRENT_YEAR = 2026
+
+# TOP_YOUTH_BENEFITS 변경 시 자동 캐시 무효화를 위한 버전 문자열
+_YOUTH_BENEFITS_VER = f"{len(TOP_YOUTH_BENEFITS)}_{TOP_YOUTH_BENEFITS[-1]['id']}"
+
+
+@st.cache_data(ttl=7*24*3600, show_spinner=False)
+def _cached_youth_eligibility(profile_json: str, region: str, _ver: str) -> dict:
+    """st.cache_data 메모리 캐시 — 동일 프로필+지역은 AI 호출 없이 즉시 반환."""
+    profile = _json.loads(profile_json)
+    region_benefits = [b for b in TOP_YOUTH_BENEFITS
+                       if b.get("region", "전국공통") in ("전국공통", region)]
+    return check_all_eligibility(profile, region_benefits)
 
 
 @st.cache_data(ttl=3600)
@@ -347,7 +360,11 @@ def render_eligibility():
                            if b.get("region", "전국공통") in ("전국공통", user_region)]
 
         with st.spinner(f"AI가 {len(region_benefits)}개 혜택을 분석하는 중입니다... (약 20~30초 소요)"):
-            results = check_all_eligibility(user_profile, region_benefits)
+            results = _cached_youth_eligibility(
+                _json.dumps(user_profile, ensure_ascii=False, sort_keys=True),
+                user_region,
+                _YOUTH_BENEFITS_VER,
+            )
         save_eligibility_results(results)
 
         cnt = {"가능": 0, "불가": 0, "확인필요": 0}

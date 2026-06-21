@@ -1,5 +1,7 @@
 import streamlit as st
 
+APP_VERSION = "2.0"
+
 # set_page_config는 st.navigation() 보다 먼저 호출
 st.set_page_config(
     page_title="내 복지 찾기",
@@ -123,4 +125,13 @@ pg = st.navigation([
     st.Page("pages/02_자격확인.py", title="자격확인", icon="✅"),
     st.Page("pages/03_신청안내.py", title="신청안내", icon="📋"),
 ])
+
+with st.sidebar:
+    st.markdown("---")
+    st.markdown(
+        f'<div style="text-align:center;font-size:0.75rem;color:#9FA6B2;padding:4px 0;">'
+        f'내 복지 찾기 &nbsp;v{APP_VERSION}</div>',
+        unsafe_allow_html=True,
+    )
+
 pg.run()
