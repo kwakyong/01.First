@@ -68,9 +68,10 @@ def render_benefits():
     st.caption(debug_msg)
     st.divider()
 
-    # 주요 혜택
+    # 주요 혜택 (지역 필터 포함: 전국공통 + 선택 지역만 표시)
     top_filtered = [b for b in TOP_YOUTH_BENEFITS
-                    if (selected_cat == "전체" or YOUTH_TO_USER_CAT.get(b["category"]) == selected_cat)
+                    if b.get("region", "전국공통") in ("전국공통", selected_region)
+                    and (selected_cat == "전체" or YOUTH_TO_USER_CAT.get(b["category"]) == selected_cat)
                     and (not search_query or search_query.lower() in b["name"].lower()
                          or search_query.lower() in b.get("description", "").lower())]
 
@@ -177,6 +178,18 @@ def render_eligibility():
         gender_opts = ["남성", "여성"]
         gender = st.selectbox("성별", gender_opts,
             index=gender_opts.index(saved.get("gender", "남성")))
+
+    col1, col2 = st.columns(2)
+    with col1:
+        saved_region = saved.get("region", "전국공통")
+        region = st.selectbox(
+            "거주 지역",
+            REGIONS,
+            index=REGIONS.index(saved_region) if saved_region in REGIONS else 0,
+            help="서울·경기 등 지역 전용 혜택 포함 여부에 영향을 줍니다",
+        )
+    with col2:
+        st.write("")  # 레이아웃 균형
 
     st.markdown('<div class="form-section-title">📚 학적 정보</div>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
@@ -311,6 +324,7 @@ def render_eligibility():
 
     user_profile = {
         "birth_year": birth_year, "age": age, "gender": gender,
+        "region": region,
         "school_status": school_status, "grade": grade,
         "income_decile": income_decile, "household": household,
         "family_situation": family_situation,
@@ -327,8 +341,13 @@ def render_eligibility():
         save_profile(user_profile)
         st.markdown('<div class="result-section-title">📊 AI 자격 분석 결과</div>', unsafe_allow_html=True)
 
-        with st.spinner(f"AI가 {len(TOP_YOUTH_BENEFITS)}개 혜택을 분석하는 중입니다... (약 20~30초 소요)"):
-            results = check_all_eligibility(user_profile, TOP_YOUTH_BENEFITS)
+        # 사용자 거주 지역에 맞는 혜택만 분석 (전국공통 + 해당 지역)
+        user_region = user_profile.get("region", "전국공통")
+        region_benefits = [b for b in TOP_YOUTH_BENEFITS
+                           if b.get("region", "전국공통") in ("전국공통", user_region)]
+
+        with st.spinner(f"AI가 {len(region_benefits)}개 혜택을 분석하는 중입니다... (약 20~30초 소요)"):
+            results = check_all_eligibility(user_profile, region_benefits)
         save_eligibility_results(results)
 
         cnt = {"가능": 0, "불가": 0, "확인필요": 0}
@@ -348,7 +367,7 @@ def render_eligibility():
             st.page_link("pages/03_신청안내.py", label="📋 가능 혜택 신청안내 보기 →", use_container_width=True)
 
         grouped = defaultdict(list)
-        for b in TOP_YOUTH_BENEFITS:
+        for b in region_benefits:
             user_cat = YOUTH_TO_USER_CAT.get(b["category"], "기타")
             grouped[user_cat].append(b)
 

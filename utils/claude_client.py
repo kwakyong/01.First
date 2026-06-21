@@ -86,6 +86,7 @@ def check_all_eligibility(user_profile: dict, benefits: list) -> dict:
         profile_lines = (
             f"나이: {user_profile.get('age')}세 / "
             f"성별: {user_profile.get('gender','미입력')} / "
+            f"거주지역: {user_profile.get('region','전국공통')} / "
             f"학적현황: {user_profile.get('school_status','미입력')} / "
             f"학년: {user_profile.get('grade','미입력')} / "
             f"가족상황: {user_profile.get('family_situation','미입력')} / "

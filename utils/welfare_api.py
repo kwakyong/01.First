@@ -547,10 +547,28 @@ TOP_YOUTH_BENEFITS = [
     },
     # 문화·여가
     {
-        "id": "youth-19", "name": "청소년 문화패스", "category": "문화·여가", "region": "전국공통",
-        "description": "만 15세 청소년에게 공연·전시·스포츠 등 문화 활동비를 지원합니다.",
+        "id": "youth-19", "name": "청소년 문화패스 (만 15세)", "category": "문화·여가", "region": "전국공통",
+        "description": "만 15세 청소년에게만 공연·전시·스포츠 등 문화 활동비를 지원합니다. 만 15세 전용.",
         "age_min": 15, "age_max": 15, "income_level": "전체",
         "amount": "연 10만원", "apply_where": "문화포털 또는 지역 문화원", "url": "",
+    },
+    {
+        "id": "youth-19b", "name": "청년문화예술패스 (만 19~20세)", "category": "문화·여가", "region": "전국공통",
+        "description": "만 19~20세(2006~2007년생) 청년 누구나 소득에 관계없이 공연·전시 관람비를 지원합니다.",
+        "age_min": 19, "age_max": 20, "income_level": "전체 (소득 무관)",
+        "amount": "연 15~20만원", "apply_where": "문화포털(culture.go.kr) 또는 누리집 신청", "url": "",
+    },
+    {
+        "id": "youth-19c", "name": "서울청년문화패스 (만 21~23세, 서울)", "category": "문화·여가", "region": "서울",
+        "description": "서울 거주 만 21~23세 청년(건강보험료 기준 중위소득 150% 이하)에게 문화 관람비를 지원합니다.",
+        "age_min": 21, "age_max": 23, "income_level": "중위소득 150% 이하",
+        "amount": "연 20만원", "apply_where": "서울청년포털(youth.seoul.go.kr)", "url": "",
+    },
+    {
+        "id": "youth-19d", "name": "경기컬처패스 (경기도)", "category": "문화·여가", "region": "경기",
+        "description": "경기도민 만 7세 이상 대상으로 문화·공연·전시 관람을 위한 문화소비쿠폰을 지급합니다.",
+        "age_min": 7, "age_max": 24, "income_level": "전체",
+        "amount": "연 최대 6만원", "apply_where": "경기문화재단 또는 토스뱅크 앱", "url": "",
     },
     {
         "id": "youth-20", "name": "청소년 수련활동 지원", "category": "문화·여가", "region": "전국공통",
