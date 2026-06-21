@@ -180,9 +180,12 @@ def render_eligibility():
     st.markdown('<div class="form-section-title">👤 기본 정보</div>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
+        _saved_birth = saved.get("birth_year", 2006)
+        if not (2002 <= _saved_birth <= 2011):
+            _saved_birth = 2006
         birth_year = st.number_input(
             "태어난 년도", min_value=2002, max_value=2011,
-            value=saved.get("birth_year", 2006), step=1,
+            value=_saved_birth, step=1,
             help="만 15~24세 (2002~2011년생)"
         )
         age = CURRENT_YEAR - birth_year
