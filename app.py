@@ -1,6 +1,6 @@
 import streamlit as st
 
-APP_VERSION = "2.0"
+APP_VERSION = "2.1"
 
 # set_page_config는 st.navigation() 보다 먼저 호출
 st.set_page_config(
