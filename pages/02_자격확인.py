@@ -4,11 +4,13 @@ import os
 from collections import defaultdict
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.welfare_api import TOP_BENEFITS, TOP_TO_USER_CAT
+from utils.welfare_api import TOP_BENEFITS, TOP_TO_USER_CAT, TOP_YOUTH_BENEFITS, YOUTH_TO_USER_CAT
 from utils.claude_client import check_all_eligibility
 from utils.profile_manager import save_profile, load_profile, delete_profile, save_eligibility_results
 
 st.set_page_config(page_title="자격 확인", page_icon="✅", layout="centered")
+
+is_youth = st.session_state.get("target_group", "senior") == "youth"
 
 CURRENT_YEAR = 2026
 
@@ -76,12 +78,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-<div class="page-header">
-    <h2>✅ 자격 확인</h2>
-    <p>내 정보를 입력하시면 AI가 받을 수 있는 혜택을 분석해 드립니다</p>
-</div>
-""", unsafe_allow_html=True)
+if is_youth:
+    st.markdown("""
+    <div class="page-header" style="background:linear-gradient(135deg,#1A3A2A 0%,#2E7D52 100%);">
+        <h2>🎓 청소년·대학생 자격 확인</h2>
+        <p>내 정보를 입력하시면 AI가 받을 수 있는 청소년·대학생 혜택을 분석해 드립니다</p>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <div class="page-header">
+        <h2>✅ 자격 확인</h2>
+        <p>내 정보를 입력하시면 AI가 받을 수 있는 혜택을 분석해 드립니다</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 saved = load_profile()
 if saved:
@@ -91,114 +101,264 @@ if saved:
         st.rerun()
 
 # ─── 입력 폼 ───────────────────────────────────────────
-with st.form("profile_form"):
+if is_youth:
+    # ── 청소년·대학생 전용 폼 ──
+    with st.form("profile_form"):
+        st.markdown('<div class="form-section-title">👤 기본 정보</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            birth_year = st.number_input(
+                "태어난 년도", min_value=2002, max_value=2011,
+                value=saved.get("birth_year", 2006), step=1,
+                help="만 15~24세 (2002~2011년생)"
+            )
+            age = CURRENT_YEAR - birth_year
+            st.markdown(f'<div class="age-display">만 {age}세</div>', unsafe_allow_html=True)
+        with col2:
+            gender_opts = ["남성", "여성"]
+            gender = st.selectbox("성별", gender_opts,
+                index=gender_opts.index(saved.get("gender", "남성")))
 
-    # 섹션 1: 기본 정보
-    st.markdown('<div class="form-section-title">👤 기본 정보</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        birth_year = st.number_input(
-            "태어난 년도", min_value=1926, max_value=2006,
-            value=saved.get("birth_year", 1961), step=1,
-            help="주민등록상 출생년도"
+        st.markdown('<div class="form-section-title">📚 학적 정보</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            school_opts = ["고등학생 재학 중", "대학교 재학 중", "대학원 재학 중",
+                           "졸업·수료", "휴학 중", "미진학·기타"]
+            school_status = st.selectbox("학적 현황", school_opts,
+                index=school_opts.index(saved.get("school_status", "대학교 재학 중"))
+                if saved.get("school_status") in school_opts else 1)
+        with col2:
+            grade_opts = ["1학년", "2학년", "3학년", "4학년", "5학년 이상", "해당없음"]
+            grade = st.selectbox("학년", grade_opts,
+                index=grade_opts.index(saved.get("grade", "1학년"))
+                if saved.get("grade") in grade_opts else 0)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            income_decile_opts = [
+                "1~2구간 — 월 286만원 이하 (기초·차상위)",
+                "3~4구간 — 월 286~515만원",
+                "5~6구간 — 월 515~744만원",
+                "7~8구간 — 월 744~1,144만원",
+                "9구간 — 월 1,144~1,716만원",
+                "10구간 — 월 1,716만원 초과",
+                "모름 (잘 모르겠어요)",
+            ]
+            income_decile = st.selectbox(
+                "가구 소득분위 (장학금 기준, 4인 가구 기준)",
+                income_decile_opts,
+                index=income_decile_opts.index(saved.get("income_decile", "모름 (잘 모르겠어요)"))
+                if saved.get("income_decile") in income_decile_opts else 6,
+            )
+        with col2:
+            household_opts = ["부모님과 함께 거주", "독립(자취·기숙사)", "보호시설 거주", "기타"]
+            household = st.selectbox("거주 형태", household_opts,
+                index=household_opts.index(saved.get("household", "부모님과 함께 거주"))
+                if saved.get("household") in household_opts else 0)
+
+        with st.expander("📌 소득분위 기준 자세히 보기 (4인 가구 월 소득인정액 기준)", expanded=False):
+            st.markdown("""
+| 구간 | 월 소득인정액 (4인 가구 기준) | 기준 중위소득 |
+|------|-------------------------------|--------------|
+| **1구간** | 171만원 이하 | 30% 이하 |
+| **2구간** | 171 ~ 286만원 | 30 ~ 50% |
+| **3구간** | 286 ~ 400만원 | 50 ~ 70% |
+| **4구간** | 400 ~ 515만원 | 70 ~ 90% |
+| **5구간** | 515 ~ 572만원 | 90 ~ 100% |
+| **6구간** | 572 ~ 744만원 | 100 ~ 130% |
+| **7구간** | 744 ~ 858만원 | 130 ~ 150% |
+| **8구간** | 858 ~ 1,144만원 | 150 ~ 200% |
+| **9구간** | 1,144 ~ 1,716만원 | 200 ~ 300% |
+| **10구간** | 1,716만원 초과 | 300% 초과 |
+""")
+            st.caption("※ 소득인정액 = 월 소득 + 재산의 소득환산액. 가구원 수에 따라 기준이 달라집니다. 정확한 구간 확인은 한국장학재단(www.kosaf.go.kr)에서 모의계산 가능합니다.")
+
+        st.markdown('<div class="form-section-title">💰 소득·생활</div>', unsafe_allow_html=True)
+
+        # 가구 상황 먼저 파악
+        family_opts = [
+            "양부모 함께 거주 (혼인 유지)",
+            "한부모 가정 (사별·이혼 등)",
+            "이혼 — 부모 각각 따로 거주",
+            "독립 자취 (부모와 별거)",
+            "보호시설·기타",
+        ]
+        family_situation = st.selectbox(
+            "가족 상황",
+            family_opts,
+            index=family_opts.index(saved.get("family_situation", "양부모 함께 거주 (혼인 유지)"))
+            if saved.get("family_situation") in family_opts else 0,
         )
-        age = CURRENT_YEAR - birth_year
-        st.markdown(f'<div class="age-display">만 {age}세</div>', unsafe_allow_html=True)
-    with col2:
-        gender_opts = ["남성", "여성"]
-        gender = st.selectbox("성별", gender_opts,
-            index=gender_opts.index(saved.get("gender", "남성")))
 
-    # 섹션 2: 가구 현황
-    st.markdown('<div class="form-section-title">🏠 가구 현황</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        household_opts = ["단독가구(혼자 사심)", "부부가구", "자녀와 함께 거주", "기타"]
-        household = st.selectbox("가구 유형", household_opts,
-            index=household_opts.index(saved.get("household", "단독가구(혼자 사심)")))
-    with col2:
-        size_opts = ["1인", "2인", "3인", "4인 이상"]
-        household_size = st.selectbox("가구원 수", size_opts,
-            index=size_opts.index(saved.get("household_size", "1인")))
+        # 상황별 소득 기준 안내
+        income_guide = {
+            "양부모 함께 거주 (혼인 유지)":    "부모 두 분의 소득 합산",
+            "한부모 가정 (사별·이혼 등)":       "함께 사는 부모 한 분의 소득",
+            "이혼 — 부모 각각 따로 거주":       "주민등록상 같은 주소의 부모 소득\n(이혼 시 함께 사는 쪽만 기준, 양쪽 합산 아님)",
+            "독립 자취 (부모와 별거)":           "미혼·만 30세 미만이면 부모 소득 포함\n(별거해도 장학금 산정 시 부모 소득 반영됨)",
+            "보호시설·기타":                     "본인 소득만 (부모 소득 미포함)",
+        }
+        guide_text = income_guide.get(family_situation, "")
+        st.info(f"📌 **이 상황에서 소득 기준:** {guide_text}")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        own_biz_opts = ["없음", "있음"]
-        own_business = st.selectbox("본인 사업자등록 여부", own_biz_opts,
-            index=own_biz_opts.index(saved.get("own_business", "없음")))
-    with col2:
-        spouse_biz_opts = ["해당없음(배우자 없음)", "없음", "있음"]
-        saved_spouse = saved.get("spouse_business", "해당없음(배우자 없음)")
-        if saved_spouse not in spouse_biz_opts:
-            saved_spouse = "해당없음(배우자 없음)"
-        spouse_business = st.selectbox("배우자 사업자등록 여부", spouse_biz_opts,
-            index=spouse_biz_opts.index(saved_spouse))
+        col1, col2 = st.columns(2)
+        with col1:
+            income_opts = [
+                "소득 없음 (무소득·실직 등)",
+                "월 200만원 미만",
+                "월 200~400만원",
+                "월 400~600만원",
+                "월 600~900만원",
+                "월 900만원 이상",
+            ]
+            income = st.selectbox(
+                "가구 월소득 (세전, 위 기준에 해당하는 소득)",
+                income_opts,
+                index=income_opts.index(saved.get("income", "월 400~600만원"))
+                if saved.get("income") in income_opts else 3,
+            )
+        with col2:
+            welfare_opts = ["없음", "기초생활수급자", "차상위계층", "한부모가족"]
+            welfare_status = st.selectbox("수급·지원 현황", welfare_opts,
+                index=welfare_opts.index(saved.get("welfare_status", "없음"))
+                if saved.get("welfare_status") in welfare_opts else 0)
 
-    # 섹션 3: 소득·재산
-    st.markdown('<div class="form-section-title">💰 소득·재산</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        income_opts = ["월 50만원 미만", "월 50~100만원", "월 100~200만원", "월 200만원 이상"]
-        income = st.selectbox("월 소득 수준 (가구 합산)", income_opts,
-            index=income_opts.index(saved.get("income", "월 50~100만원")))
-    with col2:
-        home_opts = ["자가(본인 소유)", "전세", "월세·보증금", "무주택(무료 거주 등)"]
-        saved_home = saved.get("home_ownership", "자가(본인 소유)")
-        if saved_home not in home_opts:
-            saved_home = "자가(본인 소유)"
-        home_ownership = st.selectbox("주택 소유 현황", home_opts,
-            index=home_opts.index(saved_home))
+        st.markdown('<div class="form-section-title">📋 기타</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            disability_opts = ["없음", "경증장애", "중증장애"]
+            disability = st.selectbox("장애 여부", disability_opts,
+                index=disability_opts.index(saved.get("disability", "없음"))
+                if saved.get("disability") in disability_opts else 0)
+        with col2:
+            protection_opts = ["해당없음", "자립준비청년(보호종료)"]
+            protection = st.selectbox("보호종료 청년 여부", protection_opts,
+                index=protection_opts.index(saved.get("protection", "해당없음"))
+                if saved.get("protection") in protection_opts else 0)
 
-    asset_opts = ["1억 미만", "1억~3억", "3억~5억", "5억 이상"]
-    saved_asset = saved.get("asset_level", "1억 미만")
-    if saved_asset not in asset_opts:
-        saved_asset = "1억 미만"
-    asset_level = st.selectbox("재산 규모 (부동산+금융자산 합산)", asset_opts,
-        index=asset_opts.index(saved_asset))
+        notes = st.text_area("추가 사항 (선택)", value=saved.get("notes", ""),
+            placeholder="예: 다자녀가구, 농어촌 거주, 특기사항 등")
 
-    # 섹션 4: 건강·장애
-    st.markdown('<div class="form-section-title">🏥 건강·장애</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        disability_opts = ["없음", "경증장애", "중증장애"]
-        disability = st.selectbox("장애 여부", disability_opts,
-            index=disability_opts.index(saved.get("disability", "없음")))
-    with col2:
-        health_opts = ["특이사항 없음", "만성질환(고혈압·당뇨 등)", "치매 진단", "거동 불편(와상·이동 어려움)"]
-        saved_health = saved.get("health_condition", "특이사항 없음")
-        if saved_health not in health_opts:
-            saved_health = "특이사항 없음"
-        health_condition = st.selectbox("주요 건강 상태", health_opts,
-            index=health_opts.index(saved_health))
+        st.write("")
+        col1, col2 = st.columns(2)
+        with col1:
+            submitted = st.form_submit_button("🔍 자격 확인하기", use_container_width=True, type="primary")
+        with col2:
+            save_btn = st.form_submit_button("💾 정보 저장하기", use_container_width=True)
 
-    # 섹션 5: 기타
-    st.markdown('<div class="form-section-title">📋 기타</div>', unsafe_allow_html=True)
-    veteran_opts = ["없음", "국가유공자", "참전유공자"]
-    saved_veteran = saved.get("veteran", "없음")
-    if saved_veteran not in veteran_opts:
-        saved_veteran = "없음"
-    veteran = st.selectbox("국가·참전유공자 여부", veteran_opts,
-        index=veteran_opts.index(saved_veteran))
+    user_profile = {
+        "birth_year": birth_year, "age": age, "gender": gender,
+        "school_status": school_status, "grade": grade,
+        "income_decile": income_decile, "household": household,
+        "family_situation": family_situation,
+        "income": income, "welfare_status": welfare_status,
+        "disability": disability, "protection": protection,
+        "notes": notes,
+    }
 
-    notes = st.text_area("추가 사항 (선택)", value=saved.get("notes", ""),
-        placeholder="예: 기초생활수급자, 의료급여 대상자, 독거노인 등")
+else:
+    # ── 어르신 기존 폼 ──
+    with st.form("profile_form"):
+        st.markdown('<div class="form-section-title">👤 기본 정보</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            birth_year = st.number_input(
+                "태어난 년도", min_value=1926, max_value=2006,
+                value=saved.get("birth_year", 1961), step=1,
+                help="주민등록상 출생년도"
+            )
+            age = CURRENT_YEAR - birth_year
+            st.markdown(f'<div class="age-display">만 {age}세</div>', unsafe_allow_html=True)
+        with col2:
+            gender_opts = ["남성", "여성"]
+            gender = st.selectbox("성별", gender_opts,
+                index=gender_opts.index(saved.get("gender", "남성")))
 
-    st.write("")
-    col1, col2 = st.columns(2)
-    with col1:
-        submitted = st.form_submit_button("🔍 자격 확인하기", use_container_width=True, type="primary")
-    with col2:
-        save_btn = st.form_submit_button("💾 정보 저장하기", use_container_width=True)
+        st.markdown('<div class="form-section-title">🏠 가구 현황</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            household_opts = ["단독가구(혼자 사심)", "부부가구", "자녀와 함께 거주", "기타"]
+            household = st.selectbox("가구 유형", household_opts,
+                index=household_opts.index(saved.get("household", "단독가구(혼자 사심)")))
+        with col2:
+            size_opts = ["1인", "2인", "3인", "4인 이상"]
+            household_size = st.selectbox("가구원 수", size_opts,
+                index=size_opts.index(saved.get("household_size", "1인")))
 
-# ─── 프로필 구성 ───────────────────────────────────────
-user_profile = {
-    "birth_year": birth_year, "age": age, "gender": gender,
-    "household": household, "household_size": household_size,
-    "income": income, "home_ownership": home_ownership, "asset_level": asset_level,
-    "disability": disability, "health_condition": health_condition,
-    "own_business": own_business, "spouse_business": spouse_business,
-    "veteran": veteran, "notes": notes,
-}
+        col1, col2 = st.columns(2)
+        with col1:
+            own_biz_opts = ["없음", "있음"]
+            own_business = st.selectbox("본인 사업자등록 여부", own_biz_opts,
+                index=own_biz_opts.index(saved.get("own_business", "없음")))
+        with col2:
+            spouse_biz_opts = ["해당없음(배우자 없음)", "없음", "있음"]
+            saved_spouse = saved.get("spouse_business", "해당없음(배우자 없음)")
+            if saved_spouse not in spouse_biz_opts:
+                saved_spouse = "해당없음(배우자 없음)"
+            spouse_business = st.selectbox("배우자 사업자등록 여부", spouse_biz_opts,
+                index=spouse_biz_opts.index(saved_spouse))
+
+        st.markdown('<div class="form-section-title">💰 소득·재산</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            income_opts = ["월 50만원 미만", "월 50~100만원", "월 100~200만원", "월 200만원 이상"]
+            income = st.selectbox("월 소득 수준 (가구 합산)", income_opts,
+                index=income_opts.index(saved.get("income", "월 50~100만원")))
+        with col2:
+            home_opts = ["자가(본인 소유)", "전세", "월세·보증금", "무주택(무료 거주 등)"]
+            saved_home = saved.get("home_ownership", "자가(본인 소유)")
+            if saved_home not in home_opts:
+                saved_home = "자가(본인 소유)"
+            home_ownership = st.selectbox("주택 소유 현황", home_opts,
+                index=home_opts.index(saved_home))
+
+        asset_opts = ["1억 미만", "1억~3억", "3억~5억", "5억 이상"]
+        saved_asset = saved.get("asset_level", "1억 미만")
+        if saved_asset not in asset_opts:
+            saved_asset = "1억 미만"
+        asset_level = st.selectbox("재산 규모 (부동산+금융자산 합산)", asset_opts,
+            index=asset_opts.index(saved_asset))
+
+        st.markdown('<div class="form-section-title">🏥 건강·장애</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            disability_opts = ["없음", "경증장애", "중증장애"]
+            disability = st.selectbox("장애 여부", disability_opts,
+                index=disability_opts.index(saved.get("disability", "없음")))
+        with col2:
+            health_opts = ["특이사항 없음", "만성질환(고혈압·당뇨 등)", "치매 진단", "거동 불편(와상·이동 어려움)"]
+            saved_health = saved.get("health_condition", "특이사항 없음")
+            if saved_health not in health_opts:
+                saved_health = "특이사항 없음"
+            health_condition = st.selectbox("주요 건강 상태", health_opts,
+                index=health_opts.index(saved_health))
+
+        st.markdown('<div class="form-section-title">📋 기타</div>', unsafe_allow_html=True)
+        veteran_opts = ["없음", "국가유공자", "참전유공자"]
+        saved_veteran = saved.get("veteran", "없음")
+        if saved_veteran not in veteran_opts:
+            saved_veteran = "없음"
+        veteran = st.selectbox("국가·참전유공자 여부", veteran_opts,
+            index=veteran_opts.index(saved_veteran))
+
+        notes = st.text_area("추가 사항 (선택)", value=saved.get("notes", ""),
+            placeholder="예: 기초생활수급자, 의료급여 대상자, 독거노인 등")
+
+        st.write("")
+        col1, col2 = st.columns(2)
+        with col1:
+            submitted = st.form_submit_button("🔍 자격 확인하기", use_container_width=True, type="primary")
+        with col2:
+            save_btn = st.form_submit_button("💾 정보 저장하기", use_container_width=True)
+
+    user_profile = {
+        "birth_year": birth_year, "age": age, "gender": gender,
+        "household": household, "household_size": household_size,
+        "income": income, "home_ownership": home_ownership, "asset_level": asset_level,
+        "disability": disability, "health_condition": health_condition,
+        "own_business": own_business, "spouse_business": spouse_business,
+        "veteran": veteran, "notes": notes,
+    }
 
 if save_btn:
     save_profile(user_profile)
@@ -209,8 +369,12 @@ if submitted:
     save_profile(user_profile)
     st.markdown('<div class="result-section-title">📊 AI 자격 분석 결과</div>', unsafe_allow_html=True)
 
-    with st.spinner("AI가 40개 복지서비스를 한 번에 분석하는 중입니다... (약 20~30초 소요)"):
-        results = check_all_eligibility(user_profile, TOP_BENEFITS)
+    target_benefits = TOP_YOUTH_BENEFITS if is_youth else TOP_BENEFITS
+    target_to_cat   = YOUTH_TO_USER_CAT  if is_youth else TOP_TO_USER_CAT
+    spinner_label   = f"AI가 {len(target_benefits)}개 혜택을 분석하는 중입니다... (약 20~30초 소요)"
+
+    with st.spinner(spinner_label):
+        results = check_all_eligibility(user_profile, target_benefits)
 
     save_eligibility_results(results)
 
@@ -233,8 +397,8 @@ if submitted:
 
     # 카테고리별 그룹화
     grouped = defaultdict(list)
-    for b in TOP_BENEFITS:
-        user_cat = TOP_TO_USER_CAT.get(b["category"], "기타")
+    for b in target_benefits:
+        user_cat = target_to_cat.get(b["category"], "기타")
         grouped[user_cat].append(b)
 
     # 가능 항목이 있는 카테고리를 먼저

@@ -420,3 +420,231 @@ def get_benefits_by_region(region: str) -> tuple:
 def get_benefits_by_age(age: int) -> list:
     benefits, _ = fetch_welfare_benefits()
     return [b for b in benefits if b["age_min"] <= age]
+
+
+# ────────────────────────────────────────────────────────────
+# 청소년·대학생 복지 (만 15~24세)
+# ────────────────────────────────────────────────────────────
+
+YOUTH_CATEGORIES = [
+    "학비·장학금", "생활비지원", "주거", "일자리·취업",
+    "건강·심리", "문화·여가", "자립지원", "창업·금융",
+]
+
+TOP_YOUTH_BENEFITS = [
+    # 학비·장학금
+    {
+        "id": "youth-1", "name": "국가장학금 I유형", "category": "학비·장학금", "region": "전국공통",
+        "description": "소득분위 8구간 이하 대학생에게 등록금을 지원합니다. 학자금 지원 8구간 이하 재학생 대상.",
+        "age_min": 18, "age_max": 35, "income_level": "소득분위 1~8구간",
+        "amount": "연간 최대 570만원", "apply_where": "한국장학재단 (www.kosaf.go.kr)", "url": "",
+    },
+    {
+        "id": "youth-2", "name": "국가장학금 II유형", "category": "학비·장학금", "region": "전국공통",
+        "description": "대학과 연계하여 저소득층 학생에게 등록금을 추가 지원합니다.",
+        "age_min": 18, "age_max": 35, "income_level": "소득분위 1~9구간",
+        "amount": "대학별 차등 지원", "apply_where": "한국장학재단 (www.kosaf.go.kr)", "url": "",
+    },
+    {
+        "id": "youth-3", "name": "근로장학금", "category": "학비·장학금", "region": "전국공통",
+        "description": "저소득 대학생이 교내·외에서 근로하고 장학금을 받는 제도입니다.",
+        "age_min": 18, "age_max": 35, "income_level": "소득분위 1~9구간",
+        "amount": "시간당 9,860원 (월 최대 60시간)", "apply_where": "한국장학재단 (www.kosaf.go.kr)", "url": "",
+    },
+    {
+        "id": "youth-4", "name": "취업 후 상환 학자금 대출", "category": "학비·장학금", "region": "전국공통",
+        "description": "졸업 후 취업하여 소득이 생긴 뒤에 상환하는 대학 등록금 대출입니다.",
+        "age_min": 18, "age_max": 35, "income_level": "소득분위 1~8구간",
+        "amount": "등록금 전액 (연 1.7% 고정금리)", "apply_where": "한국장학재단 (www.kosaf.go.kr)", "url": "",
+    },
+    {
+        "id": "youth-5", "name": "교육급여 (고등학생 학습지원비)", "category": "학비·장학금", "region": "전국공통",
+        "description": "기초생활수급자 고등학생에게 학용품·교재비 등 학습활동을 위한 비용을 지원합니다.",
+        "age_min": 15, "age_max": 18, "income_level": "기준 중위소득 50% 이하",
+        "amount": "연 65만원", "apply_where": "읍·면·동 주민센터", "url": "",
+    },
+    # 생활비지원
+    {
+        "id": "youth-6", "name": "생활비 대출 (일반 상환)", "category": "생활비지원", "region": "전국공통",
+        "description": "재학 중 생활비 부담을 줄이기 위한 저금리 학자금 생활비 대출입니다.",
+        "age_min": 18, "age_max": 35, "income_level": "소득분위 1~9구간",
+        "amount": "학기당 최대 150만원 (연 1.7~2.9%)", "apply_where": "한국장학재단 (www.kosaf.go.kr)", "url": "",
+    },
+    {
+        "id": "youth-7", "name": "청년내일저축계좌", "category": "생활비지원", "region": "전국공통",
+        "description": "저소득 청년이 매달 10만원을 저축하면 정부가 최대 30만원을 추가 지원합니다.",
+        "age_min": 19, "age_max": 34, "income_level": "기준 중위소득 100% 이하",
+        "amount": "월 최대 40만원 (본인 10 + 정부 30)", "apply_where": "복지로 또는 주민센터", "url": "",
+    },
+    {
+        "id": "youth-8", "name": "방과후학교 자유수강권", "category": "생활비지원", "region": "전국공통",
+        "description": "저소득층 학생이 방과후학교 프로그램을 무료로 수강할 수 있도록 바우처를 지원합니다.",
+        "age_min": 15, "age_max": 18, "income_level": "기초생활수급자·차상위계층",
+        "amount": "연 60만원 이내", "apply_where": "재학 중인 학교", "url": "",
+    },
+    {
+        "id": "youth-9", "name": "문화누리카드 (청소년)", "category": "생활비지원", "region": "전국공통",
+        "description": "기초생활수급자 및 차상위계층 청소년에게 문화·여행·체육 활동 지원카드를 드립니다.",
+        "age_min": 6, "age_max": 24, "income_level": "기초생활수급자·차상위계층",
+        "amount": "연 13만원", "apply_where": "문화누리 누리집 또는 주민센터", "url": "",
+    },
+    # 주거
+    {
+        "id": "youth-10", "name": "청년 월세 한시 특별지원", "category": "주거", "region": "전국공통",
+        "description": "부모와 독립하여 거주하는 저소득 청년에게 월세를 최대 12개월 지원합니다.",
+        "age_min": 19, "age_max": 34, "income_level": "기준 중위소득 60% 이하",
+        "amount": "월 최대 20만원 (12개월)", "apply_where": "복지로 또는 주민센터", "url": "",
+    },
+    {
+        "id": "youth-11", "name": "청년 전세임대주택", "category": "주거", "region": "전국공통",
+        "description": "LH가 전세 주택을 계약하여 저소득 청년에게 저렴하게 재임대하는 주거 지원 제도입니다.",
+        "age_min": 18, "age_max": 39, "income_level": "소득분위 1~4구간",
+        "amount": "전세금의 1~2% 저렴하게 임대", "apply_where": "LH 마이홈 (1600-1004)", "url": "",
+    },
+    # 일자리·취업
+    {
+        "id": "youth-12", "name": "국민취업지원제도 (청년 I 유형)", "category": "일자리·취업", "region": "전국공통",
+        "description": "취업에 어려움을 겪는 청년에게 취업지원서비스와 구직촉진수당을 제공합니다.",
+        "age_min": 15, "age_max": 34, "income_level": "기준 중위소득 60% 이하",
+        "amount": "월 50만원 (최대 6개월)", "apply_where": "고용복지플러스센터 또는 워크넷", "url": "",
+    },
+    {
+        "id": "youth-13", "name": "청년 일경험 지원사업", "category": "일자리·취업", "region": "전국공통",
+        "description": "미취업 청년이 기업에서 실무 경험을 쌓을 수 있도록 참여 기회를 제공하고 수당을 지급합니다.",
+        "age_min": 18, "age_max": 34, "income_level": "전체",
+        "amount": "월 최저임금 이상 (프로그램별 상이)", "apply_where": "워크넷 또는 고용복지플러스센터", "url": "",
+    },
+    {
+        "id": "youth-14", "name": "청년 직업훈련 (내일배움카드)", "category": "일자리·취업", "region": "전국공통",
+        "description": "취업 준비 청년에게 직업훈련비용을 지원하는 카드를 발급합니다.",
+        "age_min": 15, "age_max": 34, "income_level": "전체",
+        "amount": "5년간 최대 500만원", "apply_where": "고용복지플러스센터 또는 HRD-Net", "url": "",
+    },
+    {
+        "id": "youth-15", "name": "고졸 취업 지원 (중소기업 취업연계)", "category": "일자리·취업", "region": "전국공통",
+        "description": "고등학교 졸업 예정자·졸업자가 중소기업에 취업할 수 있도록 연계하고 장려금을 지원합니다.",
+        "age_min": 15, "age_max": 24, "income_level": "전체",
+        "amount": "취업성공 시 장려금 최대 200만원", "apply_where": "워크넷 또는 고용복지플러스센터", "url": "",
+    },
+    # 건강·심리
+    {
+        "id": "youth-16", "name": "청소년 건강검진", "category": "건강·심리", "region": "전국공통",
+        "description": "고등학교 1학년(만 16세)에게 무료 건강검진을 실시합니다.",
+        "age_min": 16, "age_max": 16, "income_level": "전체",
+        "amount": "무료", "apply_where": "지정 검진기관 (학교 안내)", "url": "",
+    },
+    {
+        "id": "youth-17", "name": "청년 마음건강 지원 (마음이음)", "category": "건강·심리", "region": "전국공통",
+        "description": "정신건강에 어려움을 겪는 청년에게 심리상담 바우처를 지원합니다.",
+        "age_min": 19, "age_max": 34, "income_level": "기준 중위소득 100% 이하",
+        "amount": "1인당 최대 40만원 (10회 상담)", "apply_where": "정신건강복지센터 또는 복지로", "url": "",
+    },
+    {
+        "id": "youth-18", "name": "청소년 위기상담 (청소년전화 1388)", "category": "건강·심리", "region": "전국공통",
+        "description": "학교폭력, 가출, 자해 등 위기 청소년에게 24시간 전화·문자 상담 및 긴급지원을 제공합니다.",
+        "age_min": 9, "age_max": 24, "income_level": "전체",
+        "amount": "무료 (24시간 1388)", "apply_where": "전화 1388 또는 청소년상담복지센터", "url": "",
+    },
+    # 문화·여가
+    {
+        "id": "youth-19", "name": "청소년 문화패스", "category": "문화·여가", "region": "전국공통",
+        "description": "만 15세 청소년에게 공연·전시·스포츠 등 문화 활동비를 지원합니다.",
+        "age_min": 15, "age_max": 15, "income_level": "전체",
+        "amount": "연 10만원", "apply_where": "문화포털 또는 지역 문화원", "url": "",
+    },
+    {
+        "id": "youth-20", "name": "청소년 수련활동 지원", "category": "문화·여가", "region": "전국공통",
+        "description": "청소년수련관·청소년문화의집 등에서 다양한 동아리·체험 활동 프로그램을 저렴하게 이용할 수 있습니다.",
+        "age_min": 9, "age_max": 24, "income_level": "전체",
+        "amount": "무료 또는 저렴한 수강료", "apply_where": "지역 청소년수련관·문화의집", "url": "",
+    },
+    # 자립지원
+    {
+        "id": "youth-21", "name": "자립준비청년 자립수당", "category": "자립지원", "region": "전국공통",
+        "description": "아동양육시설·공동생활가정 등에서 퇴소한 청년에게 자립 정착을 위한 수당을 지급합니다.",
+        "age_min": 18, "age_max": 24, "income_level": "전체",
+        "amount": "월 40만원 (최대 3년)", "apply_where": "읍·면·동 주민센터", "url": "",
+    },
+    {
+        "id": "youth-22", "name": "자립준비청년 초기 정착금", "category": "자립지원", "region": "전국공통",
+        "description": "보호종료 시 자립 생활에 필요한 초기 정착 비용을 일시 지원합니다.",
+        "age_min": 18, "age_max": 18, "income_level": "전체",
+        "amount": "500~1,000만원 (지역별 상이)", "apply_where": "아동보호기관 또는 주민센터", "url": "",
+    },
+    {
+        "id": "youth-23", "name": "드림스타트 (취약 아동·청소년 통합지원)", "category": "자립지원", "region": "전국공통",
+        "description": "취약가정 아동·청소년의 건강·교육·복지를 통합 지원하여 공정한 출발을 보장합니다.",
+        "age_min": 0, "age_max": 12, "income_level": "기초생활수급자·차상위계층 등",
+        "amount": "개별 서비스 연계 (무료)", "apply_where": "읍·면·동 주민센터 또는 드림스타트센터", "url": "",
+    },
+    # 창업·금융
+    {
+        "id": "youth-24", "name": "청년도약계좌", "category": "창업·금융", "region": "전국공통",
+        "description": "청년이 매달 40~70만원을 저축하면 정부기여금과 비과세 혜택으로 5년 후 목돈을 마련할 수 있습니다.",
+        "age_min": 19, "age_max": 34, "income_level": "개인소득 7,500만원 이하",
+        "amount": "5년 만기 최대 5,000만원", "apply_where": "은행 앱 (국민·신한·농협·우리·하나 등)", "url": "",
+    },
+    {
+        "id": "youth-25", "name": "청년 창업 지원 (창업진흥원)", "category": "창업·금융", "region": "전국공통",
+        "description": "아이디어가 있는 청년에게 창업 공간, 자금, 멘토링을 지원하여 사업 시작을 돕습니다.",
+        "age_min": 18, "age_max": 39, "income_level": "전체",
+        "amount": "최대 1억원 (과제별 상이)", "apply_where": "창업진흥원 K-Startup (www.k-startup.go.kr)", "url": "",
+    },
+]
+
+# TOP_YOUTH_BENEFITS category → YOUTH_CATEGORIES 매핑
+YOUTH_TO_USER_CAT = {
+    "학비·장학금": "학비·장학금",
+    "생활비지원": "생활비지원",
+    "주거": "주거",
+    "일자리·취업": "일자리·취업",
+    "건강·심리": "건강·심리",
+    "문화·여가": "문화·여가",
+    "자립지원": "자립지원",
+    "창업·금융": "창업·금융",
+}
+
+# API 키워드 → 청소년 카테고리
+_YOUTH_KEYWORD_CATEGORY = [
+    ("학비·장학금",  ["장학금", "학자금", "등록금", "교육급여", "수강권", "학습지원"]),
+    ("생활비지원",   ["생활비", "청년저축", "바우처", "급식", "생계", "긴급지원"]),
+    ("주거",         ["월세", "전세임대", "주거", "주택", "기숙사"]),
+    ("일자리·취업",  ["취업", "일자리", "인턴", "직업훈련", "훈련카드", "구직", "고졸"]),
+    ("건강·심리",    ["건강검진", "심리상담", "정신건강", "마음건강", "위기상담"]),
+    ("문화·여가",    ["문화패스", "수련", "동아리", "여가", "체험", "문화활동"]),
+    ("자립지원",     ["자립", "보호종료", "드림스타트", "위탁"]),
+    ("창업·금융",    ["청년도약", "창업", "저축계좌", "금융"]),
+]
+
+
+def _get_youth_user_category(name: str, desc: str) -> str:
+    text = (name + " " + desc).lower()
+    for cat, keywords in _YOUTH_KEYWORD_CATEGORY:
+        if any(kw in text for kw in keywords):
+            return cat
+    return "기타"
+
+
+_YOUTH_KEYWORDS = [
+    "청소년", "청년", "대학생", "고등학생", "학자금", "장학금",
+    "등록금", "수강권", "드림스타트", "자립준비", "보호종료",
+    "청년도약", "청년저축", "일경험", "고졸취업",
+]
+
+
+def get_youth_benefits_by_region(region: str) -> tuple:
+    """API 367개 중 청소년·청년 키워드 항목 필터링 + TOP_YOUTH_BENEFITS 합산."""
+    benefits, debug = fetch_welfare_benefits()
+
+    api_youth = []
+    for b in benefits:
+        text = b["name"] + " " + b.get("description", "")
+        if any(kw in text for kw in _YOUTH_KEYWORDS):
+            b = dict(b)
+            b["user_category"] = _get_youth_user_category(b["name"], b.get("description", ""))
+            api_youth.append(b)
+
+    if region != "전국공통":
+        api_youth = [b for b in api_youth if b.get("region") in ("전국공통", region)]
+
+    return api_youth, debug

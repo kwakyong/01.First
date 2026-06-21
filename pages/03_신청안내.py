@@ -3,7 +3,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.welfare_api import TOP_BENEFITS, TOP_TO_USER_CAT
+from utils.welfare_api import TOP_BENEFITS, TOP_TO_USER_CAT, TOP_YOUTH_BENEFITS, YOUTH_TO_USER_CAT
 from utils.claude_client import get_application_guide, ask_claude
 from utils.profile_manager import (
     load_profile, load_eligibility_results,
@@ -11,6 +11,10 @@ from utils.profile_manager import (
 )
 
 st.set_page_config(page_title="신청 안내", page_icon="📋", layout="centered")
+
+is_youth = st.session_state.get("target_group", "senior") == "youth"
+active_benefits   = TOP_YOUTH_BENEFITS if is_youth else TOP_BENEFITS
+active_to_user_cat = YOUTH_TO_USER_CAT  if is_youth else TOP_TO_USER_CAT
 
 CAT_ICON = {
     "노후·연금": "💛", "의료·건강": "🏥", "돌봄·요양": "🤝",
@@ -79,12 +83,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-<div class="page-header">
-    <h2>📋 신청 안내</h2>
-    <p>자격 확인된 혜택의 신청 방법을 단계별로 안내해 드립니다</p>
-</div>
-""", unsafe_allow_html=True)
+if is_youth:
+    st.markdown("""
+    <div class="page-header" style="background:linear-gradient(135deg,#1A3A2A 0%,#2E7D52 100%);">
+        <h2>🎓 청소년·대학생 신청 안내</h2>
+        <p>자격 확인된 혜택의 신청 방법을 단계별로 안내해 드립니다</p>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <div class="page-header">
+        <h2>📋 신청 안내</h2>
+        <p>자격 확인된 혜택의 신청 방법을 단계별로 안내해 드립니다</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ─── 데이터 로드 ────────────────────────────────────────
 eligibility  = load_eligibility_results()   # {서비스명: {status, reason}}
@@ -92,11 +104,11 @@ user_profile = load_profile()
 bookmarks    = load_bookmarks()             # {서비스명: "관심"|"신청예정"|"완료"}
 
 # ─── 혜택 목록 구성 ────────────────────────────────────
-possible_names  = [b["name"] for b in TOP_BENEFITS
+possible_names  = [b["name"] for b in active_benefits
                    if eligibility.get(b["name"], {}).get("status") == "가능"]
-check_names     = [b["name"] for b in TOP_BENEFITS
+check_names     = [b["name"] for b in active_benefits
                    if eligibility.get(b["name"], {}).get("status") == "확인필요"]
-all_names       = [b["name"] for b in TOP_BENEFITS]
+all_names       = [b["name"] for b in active_benefits]
 
 # 보기 모드 선택
 if eligibility:
@@ -127,7 +139,7 @@ if not display_names:
     display_names = all_names
 
 # ─── 혜택 선택 ─────────────────────────────────────────
-benefit_map = {b["name"]: b for b in TOP_BENEFITS}
+benefit_map = {b["name"]: b for b in active_benefits}
 
 st.markdown(
     '<div style="font-size:1rem;font-weight:700;color:#1B2A4A;margin-bottom:6px;">'
@@ -155,7 +167,7 @@ benefit  = benefit_map.get(selected, {})
 res = eligibility.get(selected, {})
 status = res.get("status", "")
 reason = res.get("reason", "")
-user_cat = TOP_TO_USER_CAT.get(benefit.get("category", ""), "기타")
+user_cat = active_to_user_cat.get(benefit.get("category", ""), "기타")
 cat_icon = CAT_ICON.get(user_cat, "📌")
 
 if status:

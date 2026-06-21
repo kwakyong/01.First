@@ -91,6 +91,21 @@ st.markdown("""
         margin-bottom: 20px;
         text-align: center;
     }
+
+    .group-btn-active {
+        background: #2C4A8A !important; color: white !important;
+        border: 2px solid #2C4A8A !important; border-radius: 12px !important;
+        font-weight: 700 !important; font-size: 1.05rem !important;
+    }
+    .group-btn-inactive {
+        background: white !important; color: #2C4A8A !important;
+        border: 2px solid #B8CCE8 !important; border-radius: 12px !important;
+        font-weight: 600 !important; font-size: 1.05rem !important;
+    }
+    .group-select-label {
+        font-size: 0.9rem; font-weight: 700; color: #1B2A4A;
+        text-align: center; margin-bottom: 12px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -105,6 +120,24 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── 대상 그룹 선택 ──────────────────────────────────────
+if "target_group" not in st.session_state:
+    st.session_state["target_group"] = "senior"
+
+st.markdown('<div class="group-select-label">👇 나에게 맞는 복지 유형을 선택하세요</div>', unsafe_allow_html=True)
+g_col1, g_col2 = st.columns(2, gap="medium")
+with g_col1:
+    if st.button("🧓 어르신 복지\n(60세 이상)", use_container_width=True,
+                 type="primary" if st.session_state["target_group"] == "senior" else "secondary"):
+        st.session_state["target_group"] = "senior"
+        st.rerun()
+with g_col2:
+    if st.button("🎓 청소년·대학생 복지\n(만 15~24세)", use_container_width=True,
+                 type="primary" if st.session_state["target_group"] == "youth" else "secondary"):
+        st.session_state["target_group"] = "youth"
+        st.rerun()
+
+st.markdown("---")
 st.markdown('<div class="section-label">주요 서비스</div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns(3, gap="medium")
@@ -136,8 +169,9 @@ with col3:
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("""
+group_label = "어르신 복지" if st.session_state["target_group"] == "senior" else "청소년·대학생 복지"
+st.markdown(f"""
 <div class="info-bar">
-    👈 왼쪽 메뉴에서 원하시는 서비스를 선택하세요
+    ✅ <b>{group_label}</b> 모드로 설정되었습니다 &nbsp;·&nbsp; 👈 왼쪽 메뉴에서 원하시는 서비스를 선택하세요
 </div>
 """, unsafe_allow_html=True)
