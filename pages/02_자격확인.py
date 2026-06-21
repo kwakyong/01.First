@@ -133,6 +133,22 @@ if is_youth:
                 index=grade_opts.index(saved.get("grade", "1학년"))
                 if saved.get("grade") in grade_opts else 0)
 
+        # 가족 상황 (학적 정보 바로 아래)
+        family_opts = [
+            "양부모 함께 거주 (혼인 유지)",
+            "한부모 가정 (사별·이혼 등)",
+            "이혼 — 부모 각각 따로 거주",
+            "독립 자취 (부모와 별거)",
+            "보호시설·기타",
+        ]
+        family_situation = st.selectbox(
+            "가족 상황",
+            family_opts,
+            index=family_opts.index(saved.get("family_situation", "양부모 함께 거주 (혼인 유지)"))
+            if saved.get("family_situation") in family_opts else 0,
+        )
+
+        # 가구 소득분위 + 거주형태
         col1, col2 = st.columns(2)
         with col1:
             income_decile_opts = [
@@ -172,34 +188,20 @@ if is_youth:
 | **10구간** | 1,716만원 초과 | 300% 초과 |
 """)
             st.caption("※ 소득인정액 = 월 소득 + 재산의 소득환산액. 가구원 수에 따라 기준이 달라집니다. 정확한 구간 확인은 한국장학재단(www.kosaf.go.kr)에서 모의계산 가능합니다.")
+            st.markdown("**가족 상황별 소득 산정 기준**")
+            st.markdown("""
+| 가족 상황 | 소득 산정 기준 |
+|-----------|---------------|
+| 양부모 함께 거주 | 부모 두 분의 소득 합산 |
+| 한부모 가정 (사별·이혼) | 함께 사는 부모 한 분의 소득 |
+| 이혼 — 부모 각각 거주 | 주민등록상 같은 주소의 부모 한 쪽만 (양쪽 합산 아님) |
+| 독립 자취 — 장학금 신청 시 | 미혼·만 30세 미만이면 부모 소득 포함 (독립 여부 무관) |
+| 독립 자취 — 복지혜택 신청 시 | 독립 세대주이면 본인 소득만 기준 |
+| 보호시설·기타 | 본인 소득만 (부모 소득 미포함) |
+""")
+            st.caption("※ 장학금과 복지혜택은 소득 산정 기준이 다릅니다. 독립 자취 중이라면 신청하는 혜택에 따라 기준을 별도로 확인하세요.")
 
         st.markdown('<div class="form-section-title">💰 소득·생활</div>', unsafe_allow_html=True)
-
-        # 가구 상황 먼저 파악
-        family_opts = [
-            "양부모 함께 거주 (혼인 유지)",
-            "한부모 가정 (사별·이혼 등)",
-            "이혼 — 부모 각각 따로 거주",
-            "독립 자취 (부모와 별거)",
-            "보호시설·기타",
-        ]
-        family_situation = st.selectbox(
-            "가족 상황",
-            family_opts,
-            index=family_opts.index(saved.get("family_situation", "양부모 함께 거주 (혼인 유지)"))
-            if saved.get("family_situation") in family_opts else 0,
-        )
-
-        # 상황별 소득 기준 안내
-        income_guide = {
-            "양부모 함께 거주 (혼인 유지)":    "부모 두 분의 소득 합산",
-            "한부모 가정 (사별·이혼 등)":       "함께 사는 부모 한 분의 소득",
-            "이혼 — 부모 각각 따로 거주":       "주민등록상 같은 주소의 부모 소득\n(이혼 시 함께 사는 쪽만 기준, 양쪽 합산 아님)",
-            "독립 자취 (부모와 별거)":           "미혼·만 30세 미만이면 부모 소득 포함\n(별거해도 장학금 산정 시 부모 소득 반영됨)",
-            "보호시설·기타":                     "본인 소득만 (부모 소득 미포함)",
-        }
-        guide_text = income_guide.get(family_situation, "")
-        st.info(f"📌 **이 상황에서 소득 기준:** {guide_text}")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -211,8 +213,12 @@ if is_youth:
                 "월 600~900만원",
                 "월 900만원 이상",
             ]
+            income_label = (
+                "본인 월소득 (세전)" if family_situation in ("독립 자취 (부모와 별거)", "보호시설·기타")
+                else "가구 월소득 (세전, 위 기준에 해당하는 소득)"
+            )
             income = st.selectbox(
-                "가구 월소득 (세전, 위 기준에 해당하는 소득)",
+                income_label,
                 income_opts,
                 index=income_opts.index(saved.get("income", "월 400~600만원"))
                 if saved.get("income") in income_opts else 3,
