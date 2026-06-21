@@ -1,4 +1,7 @@
+import hashlib
+import json
 import os
+import time
 from pathlib import Path
 from openai import AzureOpenAI
 from dotenv import load_dotenv
@@ -25,6 +28,75 @@ client = AzureOpenAI(
 )
 
 DEPLOYMENT_NAME = _secret("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o")
+
+# 2024년 기준 중위소득 (월, 원) — 소득 기준 % 계산용
+_SENIOR_MEDIAN_INCOME = {
+    "1인": 2_228_445,
+    "2인": 3_682_609,
+    "3인": 4_714_657,
+    "4인 이상": 5_729_913,
+}
+_INCOME_RANGE_SENIOR = {
+    "월 50만원 미만":  (0,           490_000),
+    "월 50~100만원":   (500_000,     990_000),
+    "월 100~200만원":  (1_000_000, 1_990_000),
+    "월 200만원 이상": (2_000_000, 9_999_999),
+}
+
+# ── 결과 캐시 ──────────────────────────────────────────────────────────────────
+_CACHE_DIR = BASE_DIR / "cache"
+_CACHE_TTL = 7 * 24 * 3600  # 7일
+
+
+def _cache_key(user_profile: dict, benefits: list) -> str:
+    """프로필 + 혜택 목록 조합으로 고유 캐시 키 생성."""
+    fields = {
+        "age":             user_profile.get("age"),
+        "gender":          user_profile.get("gender"),
+        "household":       user_profile.get("household"),
+        "household_size":  user_profile.get("household_size"),
+        "income":          user_profile.get("income"),
+        "home_ownership":  user_profile.get("home_ownership"),
+        "asset_level":     user_profile.get("asset_level"),
+        "disability":      user_profile.get("disability"),
+        "health_condition": sorted(user_profile.get("health_condition", []))
+                            if isinstance(user_profile.get("health_condition"), list)
+                            else [user_profile.get("health_condition", "")],
+        "veteran":         user_profile.get("veteran"),
+        "school_status":   user_profile.get("school_status"),
+        "income_decile":   user_profile.get("income_decile"),
+        "region":          user_profile.get("region"),
+        "family_situation":user_profile.get("family_situation"),
+        "benefit_ids":     sorted(b.get("id", b["name"]) for b in benefits),
+    }
+    raw = json.dumps(fields, ensure_ascii=False, sort_keys=True)
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
+def _load_cache(key: str):
+    """캐시 파일 로드. TTL 초과 또는 없으면 None 반환."""
+    _CACHE_DIR.mkdir(exist_ok=True)
+    f = _CACHE_DIR / f"{key}.json"
+    if not f.exists():
+        return None
+    try:
+        data = json.loads(f.read_text(encoding="utf-8"))
+        if time.time() - data.get("ts", 0) > _CACHE_TTL:
+            f.unlink(missing_ok=True)
+            return None
+        return data["results"]
+    except Exception:
+        return None
+
+
+def _save_cache(key: str, results: dict):
+    """결과를 캐시 파일로 저장."""
+    _CACHE_DIR.mkdir(exist_ok=True)
+    f = _CACHE_DIR / f"{key}.json"
+    f.write_text(
+        json.dumps({"ts": time.time(), "results": results}, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
 SYSTEM_PROMPT = """당신은 대한민국 사회복지 전문 상담사입니다.
 60대 이상 어르신들이 이해하기 쉽도록 쉬운 말로, 천천히, 친절하게 설명해주세요.
@@ -66,22 +138,56 @@ def check_all_eligibility(user_profile: dict, benefits: list) -> dict:
     """
     TOP_BENEFITS 전체를 단 1회 AI 호출로 자격 분석.
     반환: {서비스명: {"status": "가능"|"불가"|"확인필요", "reason": str}}
+    동일 프로필+혜택 조합은 7일간 캐시에서 즉시 반환.
     """
-    import json
+    key = _cache_key(user_profile, benefits)
+    cached = _load_cache(key)
+    if cached is not None:
+        return cached
 
     def _age_range(b):
         mn = b.get("age_min", 0)
         mx = b.get("age_max")
         return f"{mn}~{mx}세" if mx else f"{mn}세 이상"
 
-    benefit_lines = "\n".join(
-        f"- {b['name']} | 나이:{_age_range(b)} | 소득:{b.get('income_level','전체')} | {b.get('description','')[:40]}"
-        for b in benefits
-    )
-
-    # 청소년 프로필 여부 감지 (school_status 필드 존재 시)
     is_youth = "school_status" in user_profile
 
+    # ── 어르신: 건강 조건 사전 필터 + 소득% 범위 계산 ────────────────────────
+    pre_disqualified = {}
+    benefits_to_analyze = benefits
+    _income_pct = ""
+    _hh_key = "1인"
+
+    if not is_youth:
+        user_health = user_profile.get("health_condition", [])
+        if isinstance(user_health, str):
+            user_health = [user_health] if user_health else []
+
+        benefits_to_analyze = []
+        for b in benefits:
+            req = b.get("required_health", [])
+            if req and not any(h in user_health for h in req):
+                pre_disqualified[b["name"]] = {"status": "불가", "reason": "건강 조건 미해당"}
+            else:
+                benefits_to_analyze.append(b)
+
+        _hh = user_profile.get("household", "")
+        _hh_key = "2인" if _hh == "부부가구" else "1인"
+        _base = _SENIOR_MEDIAN_INCOME[_hh_key]
+        _income_str = user_profile.get("income", "")
+        _lo, _hi = _INCOME_RANGE_SENIOR.get(_income_str, (1_000_000, 1_990_000))
+        if _income_str == "월 200만원 이상":
+            _income_pct = f"중위소득 {round(_lo / _base * 100)}% 이상 ({_hh_key}가구 기준)"
+        else:
+            _income_pct = f"중위소득 {round(_lo / _base * 100)}~{round(_hi / _base * 100)}% ({_hh_key}가구 기준)"
+
+    # ── benefit_lines ─────────────────────────────────────────────────────────
+    benefit_lines = "\n".join(
+        f"- {b['name']} | 나이:{_age_range(b)} | 소득:{b.get('income_level','전체')} | {b.get('description','')[:40]}"
+        for b in benefits_to_analyze
+    )
+
+    # ── profile_lines + system_msg ────────────────────────────────────────────
     if is_youth:
         profile_lines = (
             f"나이: {user_profile.get('age')}세 / "
@@ -98,24 +204,6 @@ def check_all_eligibility(user_profile: dict, benefits: list) -> dict:
             f"보호종료청년: {user_profile.get('protection','해당없음')} / "
             f"기타: {user_profile.get('notes','없음')}"
         )
-    else:
-        profile_lines = (
-            f"나이: {user_profile.get('age')}세 / "
-            f"성별: {user_profile.get('gender','미입력')} / "
-            f"가구유형: {user_profile.get('household','미입력')} / "
-            f"가구원수: {user_profile.get('household_size','미입력')} / "
-            f"월소득: {user_profile.get('income','미입력')} / "
-            f"주택소유: {user_profile.get('home_ownership','미입력')} / "
-            f"재산규모: {user_profile.get('asset_level','미입력')} / "
-            f"장애여부: {user_profile.get('disability','없음')} / "
-            f"건강상태: {user_profile.get('health_condition','없음')} / "
-            f"본인사업자: {user_profile.get('own_business','없음')} / "
-            f"배우자사업자: {user_profile.get('spouse_business','없음')} / "
-            f"국가유공자: {user_profile.get('veteran','없음')} / "
-            f"기타: {user_profile.get('notes','없음')}"
-        )
-
-    if is_youth:
         system_msg = (
             "당신은 대한민국 청소년·대학생 복지 및 장학금 자격 분석 전문가입니다. "
             "다음 규칙을 반드시 따르세요:\n"
@@ -130,11 +218,40 @@ def check_all_eligibility(user_profile: dict, benefits: list) -> dict:
             "반드시 JSON만 출력하고 다른 설명은 쓰지 마세요."
         )
     else:
+        _hc = user_profile.get('health_condition', [])
+        _hc_str = ", ".join(_hc) if isinstance(_hc, list) else (_hc or "특이사항 없음")
+        if not _hc_str:
+            _hc_str = "특이사항 없음"
+        profile_lines = (
+            f"나이: {user_profile.get('age')}세 / "
+            f"성별: {user_profile.get('gender','미입력')} / "
+            f"가구유형: {user_profile.get('household','미입력')} / "
+            f"가구원수: {user_profile.get('household_size','미입력')} / "
+            f"월소득(본인+배우자, 자녀제외): {user_profile.get('income','미입력')} / "
+            f"소득중위%: {_income_pct} / "
+            f"주택소유(본인+배우자명의): {user_profile.get('home_ownership','미입력')} / "
+            f"재산(본인+배우자, 자녀제외): {user_profile.get('asset_level','미입력')} / "
+            f"장애여부: {user_profile.get('disability','없음')} / "
+            f"건강상태: {_hc_str} / "
+            f"본인사업자: {user_profile.get('own_business','없음')} / "
+            f"배우자사업자: {user_profile.get('spouse_business','없음')} / "
+            f"국가유공자: {user_profile.get('veteran','없음')} / "
+            f"기타: {user_profile.get('notes','없음')}"
+        )
         system_msg = (
-            "당신은 대한민국 복지 자격 분석 전문가입니다. "
-            "사용자 정보를 바탕으로 각 복지서비스 자격 여부를 판단합니다. "
-            "나이·소득 기준을 충족할 가능성이 있으면 '가능' 또는 '확인필요'로 판단하고, "
-            "명백히 기준 미달인 경우에만 '불가'로 판단하세요. "
+            "당신은 대한민국 어르신 복지 자격 분석 전문가입니다. "
+            "다음 규칙을 반드시 따르세요:\n"
+            "1. 소득·재산 판정은 어르신 본인+배우자 기준이며 자녀 소득·재산은 포함되지 않습니다.\n"
+            "2. '자녀 명의 주택 거주 (본인 무주택)'은 무주택으로 간주하여 주거 혜택에 유리하게 판단하세요.\n"
+            "3. 소득 기준 판단 — 프로필의 '소득중위%' 범위와 혜택 소득 기준 %를 비교하세요:\n"
+            "   - 소득중위% 최대값이 혜택 기준보다 낮으면 → '가능'\n"
+            "   - 소득중위% 최솟값이 혜택 기준보다 높으면 → '불가'\n"
+            "   - 범위가 혜택 기준에 걸쳐있으면 → '확인필요'\n"
+            "   예) 소득 45~89%, 100% 이하 기준 → 가능 / 소득 45~89%, 40% 이하 기준 → 불가\n"
+            "4. 소득 기준이 '전체', '건강보험 가입자 전체', 또는 '우선 배정'이 포함된 경우 소득과 무관하게 '가능'입니다.\n"
+            "5. 장애여부가 '없음'이면 장애 관련 혜택(장애인연금·장애수당·활동지원 등)은 '불가'로 판단하세요.\n"
+            "6. 나이가 혜택 최소 나이에 미달이면 '불가'로 판단하세요.\n"
+            "7. 가구유형이 '자녀와 함께 거주'여도 기초연금·장기요양·의료비 등은 어르신 단독 소득으로 판단하세요.\n"
             "반드시 JSON만 출력하고 다른 설명은 쓰지 마세요."
         )
 
@@ -161,9 +278,13 @@ status는 "가능", "불가", "확인필요" 중 하나, reason은 20자 이내:
     try:
         start = raw.find("{")
         end   = raw.rfind("}") + 1
-        return json.loads(raw[start:end])
+        ai_results = json.loads(raw[start:end])
+        final = {**pre_disqualified, **ai_results}
+        _save_cache(key, final)
+        return final
     except Exception:
-        return {b["name"]: {"status": "확인필요", "reason": "결과 파싱 오류"} for b in benefits}
+        base = {b["name"]: {"status": "확인필요", "reason": "결과 파싱 오류"} for b in benefits_to_analyze}
+        return {**pre_disqualified, **base}
 
 
 def get_application_guide(benefit_name: str, user_profile: dict = None) -> str:

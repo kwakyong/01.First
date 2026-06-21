@@ -199,24 +199,25 @@ def render_eligibility():
                 index=spouse_biz_opts.index(saved_spouse))
 
         st.markdown('<div class="form-section-title">💰 소득·재산</div>', unsafe_allow_html=True)
+        st.caption("※ 자녀와 함께 거주하셔도 기초연금·장기요양 등 대부분 어르신 혜택은 본인(+배우자) 소득과 재산만 판정에 반영됩니다.")
         col1, col2 = st.columns(2)
         with col1:
             income_opts = ["월 50만원 미만", "월 50~100만원", "월 100~200만원", "월 200만원 이상"]
-            income = st.selectbox("월 소득 수준 (가구 합산)", income_opts,
+            income = st.selectbox("본인(+배우자) 월소득 (자녀 소득 제외)", income_opts,
                 index=income_opts.index(saved.get("income", "월 50~100만원")))
         with col2:
-            home_opts = ["자가(본인 소유)", "전세", "월세·보증금", "무주택(무료 거주 등)"]
+            home_opts = ["자가(본인 소유)", "전세", "월세·보증금", "자녀 명의 주택 거주 (본인 무주택)", "무주택(무료 거주 등)"]
             saved_home = saved.get("home_ownership", "자가(본인 소유)")
             if saved_home not in home_opts:
                 saved_home = "자가(본인 소유)"
-            home_ownership = st.selectbox("주택 소유 현황", home_opts,
+            home_ownership = st.selectbox("주택 소유 현황 (본인·배우자 명의 기준)", home_opts,
                 index=home_opts.index(saved_home))
 
-        asset_opts = ["1억 미만", "1억~3억", "3억~5억", "5억 이상"]
-        saved_asset = saved.get("asset_level", "1억 미만")
+        asset_opts = ["2천만원 미만", "2천만~5천만원", "5천만~1억원", "1억~2억원", "2억~3억원", "3억 이상"]
+        saved_asset = saved.get("asset_level", "2천만원 미만")
         if saved_asset not in asset_opts:
-            saved_asset = "1억 미만"
-        asset_level = st.selectbox("재산 규모 (부동산+금융자산 합산)", asset_opts,
+            saved_asset = "2천만원 미만"
+        asset_level = st.selectbox("본인(+배우자) 재산 (부동산+금융자산, 자녀 자산 제외)", asset_opts,
             index=asset_opts.index(saved_asset))
 
         st.markdown('<div class="form-section-title">🏥 건강·장애</div>', unsafe_allow_html=True)
@@ -226,12 +227,25 @@ def render_eligibility():
             disability = st.selectbox("장애 여부", disability_opts,
                 index=disability_opts.index(saved.get("disability", "없음")))
         with col2:
-            health_opts = ["특이사항 없음", "만성질환(고혈압·당뇨 등)", "치매 진단", "거동 불편(와상·이동 어려움)"]
-            saved_health = saved.get("health_condition", "특이사항 없음")
-            if saved_health not in health_opts:
-                saved_health = "특이사항 없음"
-            health_condition = st.selectbox("주요 건강 상태", health_opts,
-                index=health_opts.index(saved_health))
+            st.write("")  # 레이블 높이 맞춤
+
+        health_opts = [
+            "만성질환 (고혈압·당뇨·관절염 등)",
+            "암 (악성 종양)",
+            "뇌졸중·심뇌혈관질환",
+            "파킨슨병·희귀질환",
+            "치매 진단 또는 의심",
+            "거동 불편 (이동·일상생활 어려움)",
+            "정신건강 어려움 (우울증·불안 등)",
+        ]
+        saved_health = saved.get("health_condition", [])
+        if isinstance(saved_health, str):
+            saved_health = [saved_health] if saved_health and saved_health != "특이사항 없음" else []
+        saved_health = [h for h in saved_health if h in health_opts]
+        health_condition = st.multiselect(
+            "주요 건강 상태 (해당 항목 모두 선택, 없으면 빈칸)", health_opts,
+            default=saved_health,
+        )
 
         st.markdown('<div class="form-section-title">📋 기타</div>', unsafe_allow_html=True)
         veteran_opts = ["없음", "국가유공자", "참전유공자"]
@@ -244,7 +258,14 @@ def render_eligibility():
         notes = st.text_area("추가 사항 (선택)", value=saved.get("notes", ""),
             placeholder="예: 기초생활수급자, 의료급여 대상자, 독거노인 등")
 
-        st.write("")
+        st.markdown("""
+<div style="background:#F0F4FA;border-left:4px solid #2C4A8A;border-radius:8px;
+            padding:12px 16px;margin:20px 0 8px 0;font-size:0.85rem;color:#4A5568;line-height:1.6;">
+    ℹ️ <b>자격 확인 안내</b><br>
+    AI 자격 확인은 주요 복지서비스 <b>45개</b>를 대상으로 분석합니다.
+    그 외 복지혜택은 <b>혜택조회</b> 메뉴에서 전체 목록을 확인하세요.
+</div>
+""", unsafe_allow_html=True)
         col1, col2 = st.columns(2)
         with col1:
             submitted = st.form_submit_button("🔍 자격 확인하기", use_container_width=True, type="primary")

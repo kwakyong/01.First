@@ -6,6 +6,9 @@
 # 사용자 데이터
 data/
 
+# AI 결과 캐시 (개인정보 포함 가능)
+cache/
+
 # Python
 __pycache__/
 *.py[cod]

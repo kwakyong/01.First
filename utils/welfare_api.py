@@ -77,6 +77,7 @@ TOP_BENEFITS = [
         "id": "top-8", "name": "노인 치매 치료관리비 지원", "category": "의료", "region": "전국공통",
         "description": "치매로 진단받은 어르신의 치료제 및 치료비를 지원합니다.",
         "age_min": 60, "income_level": "전국가구 평균소득 120% 이하",
+        "required_health": ["치매 진단 또는 의심"],
         "amount": "월 최대 36만원", "apply_where": "치매안심센터", "url": "",
     },
     {
@@ -155,7 +156,7 @@ TOP_BENEFITS = [
     {
         "id": "top-21", "name": "보건소 방문건강관리 서비스", "category": "의료", "region": "전국공통",
         "description": "거동이 불편하거나 만성질환을 가진 어르신 가정을 보건소 간호사가 직접 방문하여 건강관리를 도와드립니다.",
-        "age_min": 65, "income_level": "취약계층 우선",
+        "age_min": 65, "income_level": "전체 (취약계층·만성질환자 우선 배정)",
         "amount": "무료", "apply_where": "지역 보건소", "url": "",
     },
     {
@@ -209,7 +210,7 @@ TOP_BENEFITS = [
     {
         "id": "top-30", "name": "스마트홈 IoT 안전관리 서비스", "category": "안전", "region": "전국공통",
         "description": "독거노인 가정에 IoT 센서를 설치하여 활동 감지, 이상 행동 알림, 생활지원을 제공합니다.",
-        "age_min": 65, "income_level": "취약계층 우선",
+        "age_min": 65, "income_level": "전체 (독거노인 대상, 취약계층 우선 배정)",
         "amount": "무료 (장비 및 서비스)", "apply_where": "읍·면·동 주민센터", "url": "",
     },
     {
@@ -269,8 +270,38 @@ TOP_BENEFITS = [
     {
         "id": "top-40", "name": "노인 결식 우려자 급식 지원", "category": "생활지원", "region": "전국공통",
         "description": "결식 우려가 있는 어르신에게 경로식당 무료급식, 도시락 배달, 밑반찬 배달 서비스를 제공합니다.",
-        "age_min": 60, "income_level": "저소득층 우선",
+        "age_min": 60, "income_level": "전체 (소득 무관, 저소득·독거 우선 배정)",
         "amount": "무료 (1일 1식 이상)", "apply_where": "읍·면·동 주민센터", "url": "",
+    },
+    {
+        "id": "top-41", "name": "양곡할인 (정부양곡 할인 공급)", "category": "생활지원", "region": "전국공통",
+        "description": "정부양곡(쌀)을 기초수급가구 및 차상위계층에 시중가 대비 20% 할인 공급합니다.",
+        "age_min": 0, "income_level": "기준 중위소득 50% 이하 (차상위계층 이하)",
+        "amount": "시중가 대비 약 20% 할인", "apply_where": "읍·면·동 주민센터", "url": "",
+    },
+    {
+        "id": "top-42", "name": "건강보험 본인부담상한제", "category": "의료", "region": "전국공통",
+        "description": "연간 의료비 본인부담이 소득 수준별 상한액 초과 시 건강보험공단이 초과분을 자동 환급합니다.",
+        "age_min": 0, "income_level": "건강보험 가입자 전체 (소득별 상한액 차등)",
+        "amount": "초과 의료비 전액 환급", "apply_where": "국민건강보험공단 (자동 지급)", "url": "",
+    },
+    {
+        "id": "top-43", "name": "노인 정신건강 지원 (우울증·자살예방)", "category": "의료", "region": "전국공통",
+        "description": "60세 이상 어르신의 우울증 선별검사, 심리상담, 자살예방 프로그램을 보건소에서 무료 제공합니다.",
+        "age_min": 60, "income_level": "전체",
+        "amount": "무료", "apply_where": "지역 보건소 또는 정신건강복지센터", "url": "",
+    },
+    {
+        "id": "top-44", "name": "노인 가사간병 방문지원", "category": "돌봄서비스", "region": "전국공통",
+        "description": "저소득 어르신 가정에 가사·간병 서비스 인력을 파견하여 일상생활을 지원합니다.",
+        "age_min": 65, "income_level": "기준 중위소득 70% 이하",
+        "amount": "월 24시간 이내 (일부 본인부담)", "apply_where": "읍·면·동 주민센터", "url": "",
+    },
+    {
+        "id": "top-45", "name": "어르신 독감·폐렴구균 예방접종 (무료)", "category": "의료", "region": "전국공통",
+        "description": "만 65세 이상 어르신께 독감(인플루엔자) 및 폐렴구균 예방접종을 매년 무료로 제공합니다.",
+        "age_min": 65, "income_level": "전체 (65세 이상 누구나)",
+        "amount": "무료", "apply_where": "지역 보건소 또는 지정 의료기관", "url": "",
     },
 ]
 
